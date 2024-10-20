@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [linux, windows, darwin]
         go-version: ['1.22']  # Change to your desired Go version
         arch: ['amd64', 'arm64']
 
@@ -43,10 +43,10 @@ jobs:
         with:
           tag: ${{ github.ref }}
           files: |
-            ldap-saml-assertions-ubuntu-amd64
-            ldap-saml-assertions-ubuntu-arm64
+            ldap-saml-assertions-linux-amd64
+            ldap-saml-assertions-linux-arm64
             ldap-saml-assertions-windows-amd64.exe
-            ldap-saml-assertions-macos-amd64
-            ldap-saml-assertions-macos-arm64
+            ldap-saml-assertions-darwin-amd64
+            ldap-saml-assertions-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
