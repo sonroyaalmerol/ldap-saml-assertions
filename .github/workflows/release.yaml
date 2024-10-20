@@ -29,7 +29,7 @@ jobs:
 
       - name: Build Binary
         run: |
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }} .
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" -o ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }} .
           
       - name: Upload Binary
         uses: actions/upload-artifact@v4
