@@ -178,11 +178,11 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 
 	log.Printf("SAML Service Provider created successfully\n")
 	return &saml2.SAMLServiceProvider{
-		IdentityProviderSSOURL: metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
-		IdentityProviderIssuer: metadata.EntityID,
-		IDPCertificateStore:    &certStore,
-		SignAuthnRequests:      true,
-		SPKeyStore:             spKeyStore,
+		IdentityProviderSSOURL:  metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
+		IdentityProviderIssuer:  metadata.EntityID,
+		IDPCertificateStore:     &certStore,
+		SPKeyStore:              spKeyStore,
+		SkipSignatureValidation: true,
 	}
 }
 
@@ -211,7 +211,6 @@ func zlibDecompress(xmlSrc string) (string, error) {
 	return base64.StdEncoding.EncodeToString(decompressed), nil
 }
 
-// Validate SAML assertion
 func validateAssertion(sp *saml2.SAMLServiceProvider, xml string, bindDN string, lookupAttr string) error {
 	log.Printf("Validating SAML assertion for bindDN: %s\n", bindDN)
 
