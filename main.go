@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
@@ -40,8 +41,12 @@ func parseArgs(arguments []string) map[string]string {
 	return args
 }
 
+var acceptedPassCache map[string]string
+
 func main() {
 	s := ldap.NewServer()
+
+	acceptedPassCache = make(map[string]string)
 
 	args := parseArgs(os.Args[1:])
 	log.Printf("Parsed arguments: %+v\n", args)
@@ -103,11 +108,29 @@ type ldapHandler struct {
 }
 
 // Bind: Accept a base64-encoded SAML assertion as the password
-func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
+func (h ldapHandler) Bind(bindDN, rawPw string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	log.Printf("Received Bind request: bindDN=%s\n", bindDN)
 
 	if h.debug {
-		log.Printf("xmlAssertion=%s\n", xmlAssertion)
+		log.Printf("rawPw=%s\n", rawPw)
+	}
+
+	var hashedAssertion string
+	var xmlAssertion string
+	var isHash bool
+
+	if len(rawPw) == 64 {
+		xmlAssertion, isHash = acceptedPassCache[rawPw]
+		if !isHash {
+			log.Printf("Invalid SAML assertion: hash not found: %s\n", rawPw)
+			xmlAssertion = rawPw
+		}
+	} else {
+		hash := sha256.New()
+		hash.Write([]byte(rawPw))
+		hashedAssertion = string(hash.Sum(nil))
+		acceptedPassCache[hashedAssertion] = rawPw
+		xmlAssertion = rawPw
 	}
 
 	// Check for initial bind credentials
@@ -118,6 +141,7 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 
 	// Validate the SAML assertion
 	if err := validateAssertion(h.sp, []byte(xmlAssertion), bindDN, h.uidAttribute); err != nil {
+		delete(acceptedPassCache, hashedAssertion)
 		log.Printf("Invalid SAML assertion: %v\n", err)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
