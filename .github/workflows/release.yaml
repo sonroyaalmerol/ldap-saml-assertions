@@ -39,7 +39,7 @@ jobs:
           
       - name: Create Release
         id: create_release
-        if: matrix.os != windows
+        if: matrix.os != 'windows'
         uses: softprops/action-gh-release@v1
         with:
           tag: ${{ github.ref }}
@@ -50,7 +50,7 @@ jobs:
 
       - name: Create Windows Release
         id: create_win_release
-        if: matrix.os == windows
+        if: matrix.os == 'windows'
         uses: softprops/action-gh-release@v1
         with:
           tag: ${{ github.ref }}
