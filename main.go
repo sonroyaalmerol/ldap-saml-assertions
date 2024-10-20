@@ -188,8 +188,15 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 
 // decodeAndDecompress decodes and decompresses the SAML assertion
 func zlibDecompress(xmlSrc string) (string, error) {
+	// Try decoding as base64
+	decoded, err := base64.StdEncoding.DecodeString(xmlSrc)
+	if err != nil {
+		// If base64 decoding fails, assume the input is not encoded
+		decoded = []byte(xmlSrc)
+	}
+
 	// Create a reader for the gzipped data
-	reader, err := gzip.NewReader(bytes.NewReader([]byte(xmlSrc)))
+	reader, err := gzip.NewReader(bytes.NewReader(decoded))
 	if err != nil {
 		return "", fmt.Errorf("Decompression failed: %v", err)
 	}
@@ -198,7 +205,7 @@ func zlibDecompress(xmlSrc string) (string, error) {
 	// Read the decompressed data
 	decompressed, err := io.ReadAll(reader)
 	if err != nil {
-		return "", fmt.Errorf("Reading decompressed failed: %v", err)
+		return "", fmt.Errorf("Reading decompressed data failed: %v", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(decompressed), nil
