@@ -137,6 +137,10 @@ func (sp *CustomSAMLServiceProvider) validateAssertionSignature(el *etree.Elemen
 }
 
 func (sp *CustomSAMLServiceProvider) decryptAssertion(el *etree.Element) (*etree.Element, error) {
+	if el.Tag != saml2.EncryptedAssertionTag {
+		return el, nil
+	}
+
 	var decryptCert *tls.Certificate
 
 	encryptedAssertion := &types.EncryptedAssertion{}

@@ -40,9 +40,10 @@ Run the server with the following command:
 
 ### Command-Line Arguments
 
-- `userid`: Attribute of the username within the SAML assertion.
-- `sp_cert`: Path to the SP X.509 certificate file.
-- `sp_key`: Path to the SP private key file.
+- `userid`: Attribute of the username within the SAML assertion (default: uid).
+- `sp_acs`: ACS value of service provider to match "SubjectConfirmationData" recipient.
+- `sp_cert`: Path to the SP X.509 certificate file (only applicable if assertions are encrypted).
+- `sp_key`: Path to the SP private key file (only applicable if assertions are encrypted).
 - `idp_metadata`: URL or path to the IdP metadata XML.
 
 ### Example

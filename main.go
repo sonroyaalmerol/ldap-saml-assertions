@@ -26,6 +26,7 @@ func parseArgs(arguments []string) map[string]string {
 		"idp_metadata": "",
 		"sp_cert":      "",
 		"sp_key":       "",
+		"sp_acs":       "",
 		"initial_dn":   "cn=admin,dc=saml",
 		"initial_pw":   "secret",
 	}
@@ -72,7 +73,7 @@ func main() {
 		spKeyStore = dsig.RandomKeyStoreForTest()
 	}
 
-	sp := createServiceProvider(metadata, spKeyStore)
+	sp := createServiceProvider(metadata, spKeyStore, args["sp_acs"])
 
 	// Register Bind and Search function handlers
 	handler := ldapHandler{
@@ -162,7 +163,7 @@ func loadMetadata(idpMetadataPath string) (*types.EntityDescriptor, error) {
 }
 
 // Create SAML service provider
-func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X509KeyStore) *saml2.CustomSAMLServiceProvider {
+func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X509KeyStore, spAcs string) *saml2.CustomSAMLServiceProvider {
 	log.Printf("Creating SAML Service Provider\n")
 
 	certStore := dsig.MemoryX509CertificateStore{Roots: []*x509.Certificate{}}
@@ -185,11 +186,12 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 	log.Printf("SAML Service Provider created successfully\n")
 	return &saml2.CustomSAMLServiceProvider{
 		SAMLServiceProvider: &externalSaml2.SAMLServiceProvider{
-			IdentityProviderSSOURL:  metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
-			IdentityProviderIssuer:  metadata.EntityID,
-			IDPCertificateStore:     &certStore,
-			SPKeyStore:              spKeyStore,
-			SkipSignatureValidation: true,
+			IdentityProviderSSOURL:      metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
+			IdentityProviderIssuer:      metadata.EntityID,
+			AudienceURI:                 metadata.EntityID,
+			AssertionConsumerServiceURL: spAcs,
+			IDPCertificateStore:         &certStore,
+			SPKeyStore:                  spKeyStore,
 		},
 	}
 }
@@ -214,6 +216,11 @@ func validateAssertion(sp *saml2.CustomSAMLServiceProvider, xml []byte, bindDN s
 		return errors.New("assertion expired")
 	}
 
+	if assertionInfo.WarningInfo.NotInAudience {
+		log.Printf("Not in audience\n")
+		return errors.New("not in audience")
+	}
+
 	for _, attr := range assertionInfo.Values {
 		log.Printf("Checking attribute: %s\n", attr.Name)
 		if attr.Name == lookupAttr {
@@ -230,4 +237,3 @@ func validateAssertion(sp *saml2.CustomSAMLServiceProvider, xml []byte, bindDN s
 	log.Printf("User not found in assertion\n")
 	return errors.New("user not found in assertion")
 }
-
