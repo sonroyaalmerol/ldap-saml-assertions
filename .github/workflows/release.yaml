@@ -39,14 +39,22 @@ jobs:
           
       - name: Create Release
         id: create_release
+        if: matrix.os != windows
         uses: softprops/action-gh-release@v1
         with:
           tag: ${{ github.ref }}
           files: |
-            ldap-saml-assertions-linux-amd64
-            ldap-saml-assertions-linux-arm64
-            ldap-saml-assertions-windows-amd64.exe
-            ldap-saml-assertions-darwin-amd64
-            ldap-saml-assertions-darwin-arm64
+            ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Windows Release
+        id: create_win_release
+        if: matrix.os == windows
+        uses: softprops/action-gh-release@v1
+        with:
+          tag: ${{ github.ref }}
+          files: |
+            ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
