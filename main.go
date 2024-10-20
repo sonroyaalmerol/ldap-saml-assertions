@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
@@ -184,11 +186,41 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 	}
 }
 
+// decodeAndDecompress decodes and decompresses the SAML assertion
+func zlibDecompress(xmlSrc string) (string, error) {
+	// Decode the Base64-encoded string
+	decoded, err := base64.StdEncoding.DecodeString(xmlSrc)
+	if err != nil {
+		return "", errors.New("No valid Assertion given: Invalid characters in Base64 string")
+	}
+
+	// Create a reader for the gzipped data
+	reader, err := gzip.NewReader(bytes.NewReader(decoded))
+	if err != nil {
+		return "", errors.New("Not a gzip: Decompression failed")
+	}
+	defer reader.Close()
+
+	// Read the decompressed data
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		return "", errors.New("Read: Decompression failed")
+	}
+
+	return base64.StdEncoding.EncodeToString(decompressed), nil
+}
+
 // Validate SAML assertion
 func validateAssertion(sp *saml2.SAMLServiceProvider, xml string, bindDN string, lookupAttr string) error {
 	log.Printf("Validating SAML assertion for bindDN: %s\n", bindDN)
 
-	assertionInfo, err := sp.RetrieveAssertionInfo(xml)
+	processedXml, err := zlibDecompress(xml)
+	if err != nil {
+		log.Println(err)
+		processedXml = xml
+	}
+
+	assertionInfo, err := sp.RetrieveAssertionInfo(processedXml)
 	if err != nil {
 		log.Printf("Error parsing assertion: %v\n", err)
 		return fmt.Errorf("error parsing assertion: %w", err)
