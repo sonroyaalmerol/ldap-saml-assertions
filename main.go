@@ -191,14 +191,14 @@ func zlibDecompress(xmlSrc string) (string, error) {
 	// Create a reader for the gzipped data
 	reader, err := gzip.NewReader(bytes.NewReader([]byte(xmlSrc)))
 	if err != nil {
-		return "", errors.New("Not a gzip: Decompression failed")
+		return "", fmt.Errorf("Decompression failed: %v", err)
 	}
 	defer reader.Close()
 
 	// Read the decompressed data
 	decompressed, err := io.ReadAll(reader)
 	if err != nil {
-		return "", errors.New("Read: Decompression failed")
+		return "", fmt.Errorf("Reading decompressed failed: %v", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(decompressed), nil
