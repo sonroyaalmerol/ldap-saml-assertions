@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags, e.g., v1.0, v2.1.3
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go-version: ['1.22']  # Change to your desired Go version
+        arch: ['amd64', 'arm64']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Install Dependencies
+        run: go mod tidy
+
+      - name: Build Binary
+        run: |
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }} .
+          
+      - name: Upload Binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
+          path: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
+          
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag: ${{ github.ref }}
+          files: |
+            ldap-saml-assertions-ubuntu-amd64
+            ldap-saml-assertions-ubuntu-arm64
+            ldap-saml-assertions-windows-amd64.exe
+            ldap-saml-assertions-macos-amd64
+            ldap-saml-assertions-macos-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
