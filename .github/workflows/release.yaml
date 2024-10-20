@@ -32,7 +32,7 @@ jobs:
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }} .
           
       - name: Upload Binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
           path: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
