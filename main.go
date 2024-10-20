@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"compress/zlib"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
@@ -16,9 +14,10 @@ import (
 	"strings"
 
 	"beryju.io/ldap"
-	saml2 "github.com/russellhaering/gosaml2"
+	externalSaml2 "github.com/russellhaering/gosaml2"
 	"github.com/russellhaering/gosaml2/types"
 	dsig "github.com/russellhaering/goxmldsig"
+	"github.com/sonroyaalmerol/ldap-saml-assertions/saml2"
 )
 
 func parseArgs(arguments []string) map[string]string {
@@ -63,7 +62,7 @@ type ldapHandler struct {
 
 // Bind: Accept a base64-encoded SAML assertion as the password
 func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
-	log.Printf("Received Bind request: bindDN=%s, xmlAssertion=%s\n", bindDN, xmlAssertion)
+	log.Printf("Received Bind request: bindDN=%s\n", bindDN)
 
 	// Check for initial bind credentials
 	if bindDN == h.args["initial_dn"] && xmlAssertion == h.args["initial_pw"] {
@@ -103,7 +102,7 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 	sp := createServiceProvider(metadata, spKeyStore)
 
 	// Validate the SAML assertion
-	if err := validateAssertion(sp, xmlAssertion, bindDN, h.args["userid"]); err != nil {
+	if err := validateAssertion(sp, []byte(xmlAssertion), bindDN, h.args["userid"]); err != nil {
 		log.Printf("Invalid SAML assertion: %v\n", err)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
@@ -156,7 +155,7 @@ func loadMetadata(idpMetadataPath string) (*types.EntityDescriptor, error) {
 }
 
 // Create SAML service provider
-func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X509KeyStore) *saml2.SAMLServiceProvider {
+func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X509KeyStore) *saml2.CustomSAMLServiceProvider {
 	log.Printf("Creating SAML Service Provider\n")
 
 	certStore := dsig.MemoryX509CertificateStore{Roots: []*x509.Certificate{}}
@@ -177,41 +176,17 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 	}
 
 	log.Printf("SAML Service Provider created successfully\n")
-	return &saml2.SAMLServiceProvider{
-		IdentityProviderSSOURL:  metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
-		IdentityProviderIssuer:  metadata.EntityID,
-		IDPCertificateStore:     &certStore,
-		SPKeyStore:              spKeyStore,
-		SkipSignatureValidation: true,
+	return &saml2.CustomSAMLServiceProvider{
+		SAMLServiceProvider: &externalSaml2.SAMLServiceProvider{
+			IdentityProviderSSOURL: metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
+			IdentityProviderIssuer: metadata.EntityID,
+			IDPCertificateStore:    &certStore,
+			SPKeyStore:             spKeyStore,
+		},
 	}
 }
 
-// decodeAndDecompress decodes and decompresses the SAML assertion
-func zlibDecompress(xmlSrc string) (string, error) {
-	// Try decoding as base64
-	decoded, err := base64.StdEncoding.DecodeString(xmlSrc)
-	if err != nil {
-		// If base64 decoding fails, assume the input is not encoded
-		decoded = []byte(xmlSrc)
-	}
-
-	// Create a reader for the gzipped data
-	reader, err := zlib.NewReader(bytes.NewReader(decoded))
-	if err != nil {
-		return "", fmt.Errorf("Decompression failed: %v", err)
-	}
-	defer reader.Close()
-
-	// Read the decompressed data
-	decompressed, err := io.ReadAll(reader)
-	if err != nil {
-		return "", fmt.Errorf("Reading decompressed data failed: %v", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(decompressed), nil
-}
-
-func validateAssertion(sp *saml2.SAMLServiceProvider, xml string, bindDN string, lookupAttr string) error {
+func validateAssertion(sp *saml2.CustomSAMLServiceProvider, xml []byte, bindDN string, lookupAttr string) error {
 	log.Printf("Validating SAML assertion for bindDN: %s\n", bindDN)
 
 	processedXml, err := zlibDecompress(xml)
