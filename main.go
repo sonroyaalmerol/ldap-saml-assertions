@@ -25,6 +25,8 @@ func parseArgs(arguments []string) map[string]string {
 		"idp_metadata": "",
 		"sp_cert":      "",
 		"sp_key":       "",
+		"initial_dn":   "cn=admin,dc=saml",
+		"initial_pw":   "secret",
 	}
 	for _, arg := range arguments {
 		split := strings.SplitN(arg, "=", 2)
@@ -60,6 +62,12 @@ type ldapHandler struct {
 // Bind: Accept a base64-encoded SAML assertion as the password
 func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	log.Printf("Received Bind request: bindDN=%s, xmlAssertion=%s\n", bindDN, xmlAssertion)
+
+	// Check for initial bind credentials
+	if bindDN == h.args["initial_dn"] && xmlAssertion == h.args["initial_pw"] {
+		log.Printf("Initial bind successful for user: %s\n", bindDN)
+		return ldap.LDAPResultSuccess, nil
+	}
 
 	// Load and validate the assertion using gosaml2
 	metadata, err := loadMetadata(h.args["idp_metadata"]) // Update path to your IdP metadata
