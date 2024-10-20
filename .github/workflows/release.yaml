@@ -32,11 +32,19 @@ jobs:
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }} .
           
       - name: Upload Binary
+        if: matrix.os != 'windows'
         uses: actions/upload-artifact@v4
         with:
           name: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
           path: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
           
+      - name: Upload Windows Binary
+        if: matrix.os == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}.exe
+          path: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}.exe
+
       - name: Create Release
         id: create_release
         if: matrix.os != 'windows'
