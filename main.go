@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"compress/gzip"
+	"compress/zlib"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
@@ -196,7 +196,7 @@ func zlibDecompress(xmlSrc string) (string, error) {
 	}
 
 	// Create a reader for the gzipped data
-	reader, err := gzip.NewReader(bytes.NewReader(decoded))
+	reader, err := zlib.NewReader(bytes.NewReader(decoded))
 	if err != nil {
 		return "", fmt.Errorf("Decompression failed: %v", err)
 	}
