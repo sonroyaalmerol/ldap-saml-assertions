@@ -59,7 +59,7 @@ jobs:
               tar -C /usr/local -xzf go1.22.8.linux-amd64.tar.gz && \
               export PATH=$PATH:/usr/local/go/bin && \
               go mod tidy && \
-              go build -o ldap-saml-assertions-legacy-linux-amd64 ."
+              go build -ldflags="-s -w" -o ldap-saml-assertions-legacy-linux-amd64 ."
           
       - name: Upload Binary
         uses: actions/upload-artifact@v4
