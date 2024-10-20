@@ -13,7 +13,7 @@ jobs:
       matrix:
         os: [linux, windows, darwin, legacy-linux]
         go-version: ['1.22']  # Change to your desired Go version
-        arch: ['amd64', 'arm64']
+        arch: ['amd64']
 
     steps:
       - name: Checkout code
@@ -25,7 +25,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Install Dependencies
-        if: matrix.os != 'legacy-linux' && matrix.arch != 'arm64'
+        if: matrix.os != 'legacy-linux'
         run: go mod tidy
 
       - name: Build Binary
@@ -34,7 +34,7 @@ jobs:
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" -o ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }} .
 
       - name: Build legacy linux
-        if: matrix.os == 'legacy-linux' && matrix.arch == 'amd64'
+        if: matrix.os == 'legacy-linux'
         run: |
           docker run --rm -v ${{ github.workspace }}:/go/src/app -w /go/src/app centos:7 \
             /bin/bash -c "
@@ -54,7 +54,6 @@ jobs:
               echo 'gpgcheck=0' >> /etc/yum.repos.d/CentOS-Base.repo && \
               yum clean all && \
               yum update -y && \
-              yum install -y epel-release && \
               yum install -y wget gcc && \
               wget https://go.dev/dl/go1.22.8.linux-amd64.tar.gz && \
               tar -C /usr/local -xzf go1.22.8.linux-amd64.tar.gz && \
@@ -63,14 +62,12 @@ jobs:
               go build -o ldap-saml-assertions-legacy-linux-amd64 ."
           
       - name: Upload Binary
-        if: matrix.os != 'legacy-linux' && matrix.arch != 'arm64'
         uses: actions/upload-artifact@v4
         with:
           name: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
           path: ldap-saml-assertions-${{ matrix.os }}-${{ matrix.arch }}
           
       - name: Create Release
-        if: matrix.os != 'legacy-linux' && matrix.arch != 'arm64'
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
