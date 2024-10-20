@@ -29,6 +29,7 @@ func parseArgs(arguments []string) map[string]string {
 		"sp_acs":       "",
 		"initial_dn":   "cn=admin,dc=saml",
 		"initial_pw":   "secret",
+		"debug":        "false",
 	}
 	for _, arg := range arguments {
 		split := strings.SplitN(arg, "=", 2)
@@ -81,6 +82,7 @@ func main() {
 		adminDn:      args["initial_dn"],
 		adminPw:      args["initial_pw"],
 		uidAttribute: args["userid"],
+		debug:        args["debug"] == "true",
 	}
 	s.BindFunc("", handler)
 
@@ -97,11 +99,16 @@ type ldapHandler struct {
 	adminDn      string
 	adminPw      string
 	uidAttribute string
+	debug        bool
 }
 
 // Bind: Accept a base64-encoded SAML assertion as the password
 func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	log.Printf("Received Bind request: bindDN=%s\n", bindDN)
+
+	if h.debug {
+		log.Printf("xmlAssertion=%s\n", xmlAssertion)
+	}
 
 	// Check for initial bind credentials
 	if bindDN == h.adminDn && xmlAssertion == h.adminPw {
