@@ -44,44 +44,17 @@ func main() {
 	args := parseArgs(os.Args[1:])
 	log.Printf("Parsed arguments: %+v\n", args)
 
-	// Register Bind and Search function handlers
-	handler := ldapHandler{args: args}
-	s.BindFunc("", handler)
-
-	// Start the server
-	listen := "localhost:3389"
-	log.Printf("Starting LDAP server on %s\n", listen)
-	if err := s.ListenAndServe(listen); err != nil {
-		log.Fatalf("LDAP Server Failed: %s\n", err.Error())
-	}
-}
-
-type ldapHandler struct {
-	args map[string]string
-}
-
-// Bind: Accept a base64-encoded SAML assertion as the password
-func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
-	log.Printf("Received Bind request: bindDN=%s\n", bindDN)
-
-	// Check for initial bind credentials
-	if bindDN == h.args["initial_dn"] && xmlAssertion == h.args["initial_pw"] {
-		log.Printf("Initial bind successful for user: %s\n", bindDN)
-		return ldap.LDAPResultSuccess, nil
-	}
-
 	// Load and validate the assertion using gosaml2
-	metadata, err := loadMetadata(h.args["idp_metadata"]) // Update path to your IdP metadata
+	metadata, err := loadMetadata(args["idp_metadata"]) // Update path to your IdP metadata
 	if err != nil {
-		log.Printf("Error loading metadata: %v\n", err)
-		return ldap.LDAPResultInvalidCredentials, nil
+		log.Fatalf("Error loading metadata: %v\n", err)
 	}
 
 	log.Printf("Loaded IdP metadata successfully\n")
 
 	var spKeyStore dsig.X509KeyStore
-	spCertFile := h.args["sp_cert"]
-	spKeyFile := h.args["sp_key"]
+	spCertFile := args["sp_cert"]
+	spKeyFile := args["sp_key"]
 
 	if spCertFile != "" && spKeyFile != "" {
 		// Load SP certificate and private key from files
@@ -101,8 +74,42 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 
 	sp := createServiceProvider(metadata, spKeyStore)
 
+	// Register Bind and Search function handlers
+	handler := ldapHandler{
+		sp:           sp,
+		adminDn:      args["initial_dn"],
+		adminPw:      args["initial_pw"],
+		uidAttribute: args["userid"],
+	}
+	s.BindFunc("", handler)
+
+	// Start the server
+	listen := "localhost:3389"
+	log.Printf("Starting LDAP server on %s\n", listen)
+	if err := s.ListenAndServe(listen); err != nil {
+		log.Fatalf("LDAP Server Failed: %s\n", err.Error())
+	}
+}
+
+type ldapHandler struct {
+	sp           *saml2.CustomSAMLServiceProvider
+	adminDn      string
+	adminPw      string
+	uidAttribute string
+}
+
+// Bind: Accept a base64-encoded SAML assertion as the password
+func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
+	log.Printf("Received Bind request: bindDN=%s\n", bindDN)
+
+	// Check for initial bind credentials
+	if bindDN == h.adminDn && xmlAssertion == h.adminPw {
+		log.Printf("Initial bind successful for user: %s\n", bindDN)
+		return ldap.LDAPResultSuccess, nil
+	}
+
 	// Validate the SAML assertion
-	if err := validateAssertion(sp, []byte(xmlAssertion), bindDN, h.args["userid"]); err != nil {
+	if err := validateAssertion(h.sp, []byte(xmlAssertion), bindDN, h.uidAttribute); err != nil {
 		log.Printf("Invalid SAML assertion: %v\n", err)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}

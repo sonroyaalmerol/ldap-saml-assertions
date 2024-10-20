@@ -7,8 +7,7 @@ This project implements a **fake LDAP server** designed to facilitate SAML authe
 ## Features
 
 - **SAML Assertion Handling**: Validates SAML assertions received from SOGo.
-- **LDAP Compatibility**: Mimics LDAP behavior, allowing Dovecot to authenticate users using the fake LDAP server.
-- **Custom Key Store**: Option to use X.509 certificate and private key for secure communication.
+- **LDAP BIND (only) Compatibility**: Mimics LDAP behavior, allowing Dovecot to authenticate users using the fake LDAP server.
 
 ## Prerequisites
 
@@ -44,14 +43,14 @@ Run the server with the following command:
 - `userid`: Attribute of the username within the SAML assertion.
 - `sp_cert`: Path to the SP X.509 certificate file.
 - `sp_key`: Path to the SP private key file.
-- `idp`: URL or path to the IdP metadata XML.
+- `idp_metadata`: URL or path to the IdP metadata XML.
 
 ### Example
 
 To run the server with a certificate and key:
 
 ```bash
-./ldap-saml-assertions sp_cert=/etc/ssl/certs/sp-cert.pem sp_key=/etc/ssl/private/sp-key.pem idp=https://example.com/idp/metadata.xml
+./ldap-saml-assertions sp_cert=/etc/ssl/certs/sp-cert.pem sp_key=/etc/ssl/private/sp-key.pem idp_metadata=https://example.com/idp/metadata.xml
 ```
 
 ## Dovecot Configuration
@@ -70,7 +69,11 @@ passdb {
 ```conf
 hosts = localhost:3389
 ldap_version = 3
+base = dc=saml
+dn = cn=admin,dc=saml
+dnpass = secret
 auth_bind = yes
+auth_bind_userdn = %u
 ```
 
 Make sure to replace the placeholders with actual values relevant to your setup.

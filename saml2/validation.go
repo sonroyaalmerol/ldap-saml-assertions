@@ -9,7 +9,6 @@ import (
 	saml2 "github.com/russellhaering/gosaml2"
 	"github.com/russellhaering/gosaml2/types"
 	dsig "github.com/russellhaering/goxmldsig"
-	"github.com/russellhaering/goxmldsig/etreeutils"
 )
 
 type CustomSAMLServiceProvider struct {
@@ -21,13 +20,13 @@ type CustomSAMLServiceProvider struct {
 // decrypt the assertion if it was encrypted.
 func (sp *CustomSAMLServiceProvider) ValidateAssertion(rawAssertion []byte) (*types.Assertion, error) {
 	// Parse the raw assertion XML
-	_, el, err := parseResponse(rawAssertion, sp.MaximumDecompressedBodySize)
+	el, err := parseResponse(rawAssertion, sp.MaximumDecompressedBodySize)
 	if err != nil {
 		return nil, err
 	}
 
 	// Decrypt the assertion if it's encrypted
-	err = sp.decryptAssertion(el)
+	el, err = sp.decryptAssertion(el)
 	if err != nil {
 		return nil, err
 	}
@@ -127,12 +126,7 @@ func (sp *CustomSAMLServiceProvider) validationContext() *dsig.ValidationContext
 }
 
 func (sp *CustomSAMLServiceProvider) validateAssertionSignature(el *etree.Element) error {
-	assertion, err := etreeutils.NSFindOne(el, saml2.SAMLAssertionNamespace, saml2.AssertionTag)
-	if err != nil {
-		return err
-	}
-
-	_, err = sp.validationContext().Validate(assertion)
+	_, err := sp.validationContext().Validate(el)
 	if err == dsig.ErrMissingSignature {
 		return nil
 	} else if err != nil {
@@ -142,37 +136,29 @@ func (sp *CustomSAMLServiceProvider) validateAssertionSignature(el *etree.Elemen
 	return nil
 }
 
-func (sp *CustomSAMLServiceProvider) decryptAssertion(el *etree.Element) error {
+func (sp *CustomSAMLServiceProvider) decryptAssertion(el *etree.Element) (*etree.Element, error) {
 	var decryptCert *tls.Certificate
 
-	assertion, err := etreeutils.NSFindOne(el, saml2.SAMLAssertionNamespace, saml2.EncryptedAssertionTag)
-	if err != nil {
-		return err
-	}
-
 	encryptedAssertion := &types.EncryptedAssertion{}
-	err = xmlUnmarshalElement(assertion, encryptedAssertion)
+	err := xmlUnmarshalElement(el, encryptedAssertion)
 	if err != nil {
-		return fmt.Errorf("unable to unmarshal encrypted assertion: %v", err)
+		return nil, fmt.Errorf("unable to unmarshal encrypted assertion: %v", err)
 	}
 
 	decryptCert, err = sp.getDecryptCert()
 	if err != nil {
-		return fmt.Errorf("unable to get decryption certificate: %v", err)
+		return nil, fmt.Errorf("unable to get decryption certificate: %v", err)
 	}
 
 	raw, derr := encryptedAssertion.DecryptBytes(decryptCert)
 	if derr != nil {
-		return fmt.Errorf("unable to decrypt encrypted assertion: %v", derr)
+		return nil, fmt.Errorf("unable to decrypt encrypted assertion: %v", derr)
 	}
 
-	doc, _, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
+	decryptedEl, err := parseResponse(raw, sp.MaximumDecompressedBodySize)
 	if err != nil {
-		return fmt.Errorf("unable to create element from decrypted assertion bytes: %v", err)
+		return nil, fmt.Errorf("unable to create element from decrypted assertion bytes: %v", err)
 	}
 
-	el.RemoveChild(assertion)
-	el.AddChild(doc)
-
-	return nil
+	return decryptedEl, nil
 }

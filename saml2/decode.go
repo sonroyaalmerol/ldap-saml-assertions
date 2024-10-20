@@ -42,30 +42,29 @@ func maybeDeflate(data []byte, maxSize int64, decoder func([]byte) error) error 
 	return decoder(deflated)
 }
 
-// parseResponse is a helper function that was refactored out so that the XML parsing behavior can be isolated and unit tested
-func parseResponse(xml []byte, maxSize int64) (*etree.Document, *etree.Element, error) {
+// parseResponse parses the XML and returns the root element of the response (or assertion in your case)
+func parseResponse(xml []byte, maxSize int64) (*etree.Element, error) {
 	var doc *etree.Document
-	var rawXML []byte
 
 	err := maybeDeflate(xml, maxSize, func(xml []byte) error {
 		doc = etree.NewDocument()
-		rawXML = xml
 		return doc.ReadFromBytes(xml)
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	el := doc.Root()
 	if el == nil {
-		return nil, nil, fmt.Errorf("unable to parse response")
+		return nil, fmt.Errorf("unable to parse response")
 	}
 
 	// Examine the response for attempts to exploit weaknesses in Go's encoding/xml
-	err = rtvalidator.Validate(bytes.NewReader(rawXML))
+	err = rtvalidator.Validate(bytes.NewReader(xml))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return doc, el, nil
+	// In this case, we only need to return the root element (which could be the assertion itself)
+	return el, nil
 }
