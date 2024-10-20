@@ -185,10 +185,11 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 	log.Printf("SAML Service Provider created successfully\n")
 	return &saml2.CustomSAMLServiceProvider{
 		SAMLServiceProvider: &externalSaml2.SAMLServiceProvider{
-			IdentityProviderSSOURL: metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
-			IdentityProviderIssuer: metadata.EntityID,
-			IDPCertificateStore:    &certStore,
-			SPKeyStore:             spKeyStore,
+			IdentityProviderSSOURL:  metadata.IDPSSODescriptor.SingleSignOnServices[0].Location,
+			IdentityProviderIssuer:  metadata.EntityID,
+			IDPCertificateStore:     &certStore,
+			SPKeyStore:              spKeyStore,
+			SkipSignatureValidation: true,
 		},
 	}
 }
