@@ -25,6 +25,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Install Dependencies
+        if: matrix.os != 'legacy-linux' && matrix.arch != 'arm64'
         run: go mod tidy
 
       - name: Build Binary
@@ -39,15 +40,27 @@ jobs:
             /bin/bash -c "
               rm -f /etc/yum.repos.d/CentOS-Base.repo && \
               rm -f /etc/yum.repos.d/CentOS-*.repo && \
-              echo "[CentOS-Base]" > /etc/yum.repos.d/CentOS-Base.repo && \
-              echo "name=CentOS-Base" >> /etc/yum.repos.d/CentOS-Base.repo && \
-              echo "baseurl=http://vault.centos.org/7.9.2009/os/x86_64/" >> /etc/yum.repos.d/CentOS-Base.repo && \
-              echo "enabled=1" >> /etc/yum.repos.d/CentOS-Base.repo && \
-              echo "gpgcheck=0" >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo '[base]' > /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'name=CentOS-7 - Base' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'baseurl=http://vault.centos.org/7.9.2009/os/x86_64/' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'gpgcheck=0' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo '[updates]' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'name=CentOS-7 - Updates' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'baseurl=http://vault.centos.org/7.9.2009/updates/x86_64/' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'gpgcheck=0' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo '[extras]' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'name=CentOS-7 - Extras' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'baseurl=http://vault.centos.org/7.9.2009/extras/x86_64/' >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo 'gpgcheck=0' >> /etc/yum.repos.d/CentOS-Base.repo && \
               yum clean all && \
               yum update -y && \
               yum install -y epel-release && \
-              yum install -y golang gcc && go build -o ldap-saml-assertions-legacy-linux-amd64 ."
+              yum install -y wget gcc && \
+              wget https://go.dev/dl/go1.22.8.linux-amd64.tar.gz && \
+              tar -C /usr/local -xzf go1.22.8.linux-amd64.tar.gz && \
+              export PATH=$PATH:/usr/local/go/bin && \
+              go mod tidy && \
+              go build -o ldap-saml-assertions-legacy-linux-amd64 ."
           
       - name: Upload Binary
         if: matrix.os != 'legacy-linux' && matrix.arch != 'arm64'
