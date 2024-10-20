@@ -43,7 +43,7 @@ jobs:
               echo "name=CentOS-Base" >> /etc/yum.repos.d/CentOS-Base.repo && \
               echo "baseurl=http://vault.centos.org/7.9.2009/os/x86_64/" >> /etc/yum.repos.d/CentOS-Base.repo && \
               echo "enabled=1" >> /etc/yum.repos.d/CentOS-Base.repo && \
-              echo "gpgcheck=1" >> /etc/yum.repos.d/CentOS-Base.repo && \
+              echo "gpgcheck=0" >> /etc/yum.repos.d/CentOS-Base.repo && \
               yum clean all && \
               yum update -y && \
               yum install -y epel-release && \
