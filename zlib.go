@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"log"
 )
 
 func zlibDecompress(xmlSrc []byte) ([]byte, error) {
