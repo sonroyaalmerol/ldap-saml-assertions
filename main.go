@@ -31,6 +31,7 @@ func parseArgs(arguments []string) map[string]string {
 		"initial_dn":   "cn=admin,dc=saml",
 		"initial_pw":   "secret",
 		"debug":        "false",
+		"silent":		"false",
 	}
 	for _, arg := range arguments {
 		split := strings.SplitN(arg, "=", 2)
@@ -41,12 +42,8 @@ func parseArgs(arguments []string) map[string]string {
 	return args
 }
 
-var acceptedPassCache map[string]string
-
 func main() {
 	s := ldap.NewServer()
-
-	acceptedPassCache = make(map[string]string)
 
 	args := parseArgs(os.Args[1:])
 	log.Printf("Parsed arguments: %+v\n", args)
@@ -88,6 +85,7 @@ func main() {
 		adminPw:      args["initial_pw"],
 		uidAttribute: args["userid"],
 		debug:        args["debug"] == "true",
+		silent:        args["silent"] == "true",
 	}
 	s.BindFunc("", handler)
 
@@ -105,32 +103,17 @@ type ldapHandler struct {
 	adminPw      string
 	uidAttribute string
 	debug        bool
+	silent		 bool
 }
 
 // Bind: Accept a base64-encoded SAML assertion as the password
-func (h ldapHandler) Bind(bindDN, rawPw string, conn net.Conn) (ldap.LDAPResultCode, error) {
-	log.Printf("Received Bind request: bindDN=%s\n", bindDN)
+func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAPResultCode, error) {
+	if !h.silent {
+		log.Printf("Received Bind request: bindDN=%s\n", bindDN)
+	}
 
 	if h.debug {
 		log.Printf("rawPw=%s\n", rawPw)
-	}
-
-	var hashedAssertion string
-	var xmlAssertion string
-	var isHash bool
-
-	if len(rawPw) == 64 {
-		xmlAssertion, isHash = acceptedPassCache[rawPw]
-		if !isHash {
-			log.Printf("Invalid SAML assertion: hash not found: %s\n", rawPw)
-			xmlAssertion = rawPw
-		}
-	} else {
-		hash := sha256.New()
-		hash.Write([]byte(rawPw))
-		hashedAssertion = string(hash.Sum(nil))
-		acceptedPassCache[hashedAssertion] = rawPw
-		xmlAssertion = rawPw
 	}
 
 	// Check for initial bind credentials
@@ -140,9 +123,10 @@ func (h ldapHandler) Bind(bindDN, rawPw string, conn net.Conn) (ldap.LDAPResultC
 	}
 
 	// Validate the SAML assertion
-	if err := validateAssertion(h.sp, []byte(xmlAssertion), bindDN, h.uidAttribute); err != nil {
-		delete(acceptedPassCache, hashedAssertion)
-		log.Printf("Invalid SAML assertion: %v\n", err)
+	if err := validateAssertion(h, []byte(xmlAssertion), bindDN); err != nil {
+		if !h.silent {
+			log.Printf("Invalid SAML assertion: %v\n", err)
+		}
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -227,8 +211,13 @@ func createServiceProvider(metadata *types.EntityDescriptor, spKeyStore dsig.X50
 	}
 }
 
-func validateAssertion(sp *saml2.CustomSAMLServiceProvider, xml []byte, bindDN string, lookupAttr string) error {
-	log.Printf("Validating SAML assertion for bindDN: %s\n", bindDN)
+func validateAssertion(h ldapHandler, xml []byte, bindDN string) error {
+	sp := h.sp
+	lookupAttr := h.uidAttribute
+
+	if !h.silent {
+		log.Printf("Validating SAML assertion for bindDN: %s\n", bindDN)
+	}
 
 	processedXml, err := zlibDecompress(xml)
 	if err != nil {
@@ -238,33 +227,35 @@ func validateAssertion(sp *saml2.CustomSAMLServiceProvider, xml []byte, bindDN s
 
 	assertionInfo, err := sp.RetrieveAssertionInfo(processedXml)
 	if err != nil {
-		log.Printf("Error parsing assertion: %v\n", err)
 		return fmt.Errorf("error parsing assertion: %w", err)
 	}
 
 	if assertionInfo.WarningInfo.InvalidTime {
-		log.Printf("Assertion expired\n")
 		return errors.New("assertion expired")
 	}
 
 	if assertionInfo.WarningInfo.NotInAudience {
-		log.Printf("Not in audience\n")
 		return errors.New("not in audience")
 	}
 
 	for _, attr := range assertionInfo.Values {
-		log.Printf("Checking attribute: %s\n", attr.Name)
+		if !h.silent {
+			log.Printf("Checking attribute: %s\n", attr.Name)
+		}
 		if attr.Name == lookupAttr {
 			for _, value := range attr.Values {
-				log.Printf("Comparing value: %s with bindDN: %s\n", value.Value, bindDN)
+				if !h.silent {
+					log.Printf("Comparing value: %s with bindDN: %s\n", value.Value, bindDN)
+				}
 				if value.Value == bindDN {
-					log.Printf("User found in assertion\n")
+					if !h.silent {
+						log.Printf("User found in assertion\n")
+					}
 					return nil
 				}
 			}
 		}
 	}
 
-	log.Printf("User not found in assertion\n")
 	return errors.New("user not found in assertion")
 }
