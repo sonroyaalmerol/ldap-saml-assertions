@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
@@ -113,7 +112,7 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 	}
 
 	if h.debug {
-		log.Printf("rawPw=%s\n", rawPw)
+		log.Printf("rawPw=%s\n", xmlAssertion)
 	}
 
 	// Check for initial bind credentials
