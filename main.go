@@ -220,7 +220,9 @@ func validateAssertion(h ldapHandler, xml []byte, bindDN string) error {
 
 	processedXml, err := zlibDecompress(xml)
 	if err != nil {
-		log.Println(err)
+		if !h.silent {
+			log.Println(err)
+		}
 		processedXml = xml
 	}
 
