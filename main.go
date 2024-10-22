@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,7 +89,7 @@ func main() {
 
 	sp := createServiceProvider(metadata, spKeyStore, args["sp_acs"])
 
-	expireTime, err := strings.Atoi(args["expire_time"])
+	expireTime, err := strconv.Atoi(args["expire_time"])
 	if err != nil {
 		expireTime = 4
 	}
