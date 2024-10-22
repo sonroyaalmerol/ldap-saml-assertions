@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"beryju.io/ldap"
 	externalSaml2 "github.com/russellhaering/gosaml2"
@@ -41,12 +42,17 @@ func parseArgs(arguments []string) map[string]string {
 	return args
 }
 
-var knownUsers map[string]string
+type KnownUserAssertion struct {
+	Assertion string
+	LastUsed  time.Time
+}
+
+var knownUserAssertions map[string][]KnownUserAssertion
 
 func main() {
 	s := ldap.NewServer()
 
-	knownUsers = make(map[string]string)
+	knownUserAssertions = make(map[string][]KnownUserAssertion)
 
 	args := parseArgs(os.Args[1:])
 	log.Printf("Parsed arguments: %+v\n", args)
@@ -125,11 +131,17 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 		return ldap.LDAPResultSuccess, nil
 	}
 
-	knownUserAssertion, ok := knownUsers[bindDN]
-	if ok {
-		if knownUserAssertion == xmlAssertion {
+	knownAssertions := knownUserAssertions[bindDN]
+	for i, userAssertion := range knownAssertions {
+		if userAssertion.Assertion == xmlAssertion && time.Since(userAssertion.LastUsed) <= 1*time.Hour {
 			log.Printf("User %s authenticated successfully\n", bindDN)
+			knownUserAssertions[bindDN][i].LastUsed = time.Now()
 			return ldap.LDAPResultSuccess, nil
+		}
+
+		// Remove expired assertions
+		if time.Since(userAssertion.LastUsed) > 1*time.Hour {
+			knownUserAssertions[bindDN] = append(knownAssertions[:i], knownAssertions[i+1:]...)
 		}
 	}
 
@@ -141,7 +153,11 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
-	knownUsers[bindDN] = knownUserAssertion
+	// Add the assertion to known assertions
+	knownUserAssertions[bindDN] = append(knownUserAssertions[bindDN], KnownUserAssertion{
+		Assertion: xmlAssertion,
+		LastUsed:  time.Now(),
+	})
 
 	log.Printf("User %s authenticated successfully\n", bindDN)
 	return ldap.LDAPResultSuccess, nil
