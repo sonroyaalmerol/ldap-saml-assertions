@@ -32,6 +32,7 @@ func parseArgs(arguments []string) map[string]string {
 		"initial_pw":   "secret",
 		"debug":        "false",
 		"silent":		"false",
+		"expire_time":	"4",
 	}
 	for _, arg := range arguments {
 		split := strings.SplitN(arg, "=", 2)
@@ -87,6 +88,11 @@ func main() {
 
 	sp := createServiceProvider(metadata, spKeyStore, args["sp_acs"])
 
+	expireTime, err := strings.Atoi(args["expire_time"])
+	if err != nil {
+		expireTime = 4
+	}
+
 	// Register Bind and Search function handlers
 	handler := ldapHandler{
 		sp:           sp,
@@ -94,7 +100,8 @@ func main() {
 		adminPw:      args["initial_pw"],
 		uidAttribute: args["userid"],
 		debug:        args["debug"] == "true",
-		silent:        args["silent"] == "true",
+		silent:       args["silent"] == "true",
+		expireTime:   expireTime,
 	}
 	s.BindFunc("", handler)
 
@@ -113,6 +120,7 @@ type ldapHandler struct {
 	uidAttribute string
 	debug        bool
 	silent		 bool
+	expireTime	 int
 }
 
 // Bind: Accept a base64-encoded SAML assertion as the password
@@ -133,14 +141,14 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 
 	knownAssertions := knownUserAssertions[bindDN]
 	for i, userAssertion := range knownAssertions {
-		if userAssertion.Assertion == xmlAssertion && time.Since(userAssertion.LastUsed) <= 1*time.Hour {
+		if userAssertion.Assertion == xmlAssertion && time.Since(userAssertion.LastUsed) <= time.Duration(h.expireTime)*time.Hour {
 			log.Printf("User %s authenticated successfully\n", bindDN)
 			knownUserAssertions[bindDN][i].LastUsed = time.Now()
 			return ldap.LDAPResultSuccess, nil
 		}
 
 		// Remove expired assertions
-		if time.Since(userAssertion.LastUsed) > 1*time.Hour {
+		if time.Since(userAssertion.LastUsed) > time.Duration(h.expireTime)*time.Hour {
 			knownUserAssertions[bindDN] = append(knownAssertions[:i], knownAssertions[i+1:]...)
 		}
 	}
