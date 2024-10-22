@@ -41,8 +41,12 @@ func parseArgs(arguments []string) map[string]string {
 	return args
 }
 
+var knownUsers map[string]string
+
 func main() {
 	s := ldap.NewServer()
+
+	knownUsers = make(map[string]string)
 
 	args := parseArgs(os.Args[1:])
 	log.Printf("Parsed arguments: %+v\n", args)
@@ -121,6 +125,14 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 		return ldap.LDAPResultSuccess, nil
 	}
 
+	knownUserAssertion, ok := knownUsers[bindDN]
+	if ok {
+		if knownUserAssertion == xmlAssertion {
+			log.Printf("User %s authenticated successfully\n", bindDN)
+			return ldap.LDAPResultSuccess, nil
+		}
+	}
+
 	// Validate the SAML assertion
 	if err := validateAssertion(h, []byte(xmlAssertion), bindDN); err != nil {
 		if !h.silent {
@@ -128,6 +140,8 @@ func (h ldapHandler) Bind(bindDN, xmlAssertion string, conn net.Conn) (ldap.LDAP
 		}
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
+
+	knownUsers[bindDN] = knownUserAssertion
 
 	log.Printf("User %s authenticated successfully\n", bindDN)
 	return ldap.LDAPResultSuccess, nil
